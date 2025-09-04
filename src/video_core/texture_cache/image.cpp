@@ -7,6 +7,7 @@
 #include "video_core/renderer_vulkan/vk_instance.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/texture_cache/image.h"
+#include "video_core/utils.h"
 
 #include <vk_mem_alloc.h>
 
@@ -306,10 +307,11 @@ void Image::Transit(vk::ImageLayout dst_layout, vk::Flags<vk::AccessFlagBits2> d
         scheduler->EndRendering();
         cmdbuf = scheduler->CommandBuffer();
     }
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .imageMemoryBarrierCount = static_cast<u32>(barriers.size()),
         .pImageMemoryBarriers = barriers.data(),
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {}, ::std::vector(barriers.begin(), barriers.end()));
 }
 
 void Image::Upload(vk::Buffer buffer, u64 offset) {
@@ -432,20 +434,23 @@ void Image::CopyImageWithBuffer(Image& src_image, vk::Buffer buffer, u64 offset)
     Transit(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite, {});
 
     auto cmdbuf = scheduler->CommandBuffer();
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &pre_copy_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {pre_copy_barrier}, {}, vk::DependencyFlagBits::eByRegion);
 
     cmdbuf.copyImageToBuffer(src_image.image, vk::ImageLayout::eTransferSrcOptimal, buffer,
                              buffer_copies);
 
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &post_copy_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {post_copy_barrier},
+                             {}, vk::DependencyFlagBits::eByRegion);
 
     for (auto& copy : buffer_copies) {
         copy.imageSubresource.aspectMask = aspect_mask & ~vk::ImageAspectFlagBits::eStencil;

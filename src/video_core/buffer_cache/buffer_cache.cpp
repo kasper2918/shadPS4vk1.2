@@ -18,6 +18,7 @@
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/renderer_vulkan/vk_shader_util.h"
 #include "video_core/texture_cache/texture_cache.h"
+#include "video_core/utils.h"
 
 namespace VideoCore {
 
@@ -436,11 +437,13 @@ void BufferCache::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, 
     };
     scheduler.EndRendering();
     const auto cmdbuf = scheduler.CommandBuffer();
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 2,
         .pBufferMemoryBarriers = buf_barriers_before,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {buf_barriers_before[0], buf_barriers_before[1]}, {},
+                             vk::DependencyFlagBits::eByRegion);
     cmdbuf.copyBuffer(src_buffer.Handle(), dst_buffer.Handle(), region);
     const vk::BufferMemoryBarrier2 buf_barriers_after[2] = {
         {
@@ -462,11 +465,13 @@ void BufferCache::CopyBuffer(VAddr dst, VAddr src, u32 num_bytes, bool dst_gds, 
             .size = num_bytes,
         },
     };
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 2,
         .pBufferMemoryBarriers = buf_barriers_after,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {buf_barriers_after[0], buf_barriers_after[1]}, {},
+                             vk::DependencyFlagBits::eByRegion);
 }
 
 std::pair<Buffer*, u32> BufferCache::ObtainBuffer(VAddr device_addr, u32 size, bool is_written,
@@ -638,11 +643,13 @@ void BufferCache::JoinOverlap(BufferId new_buffer_id, BufferId overlap_id,
                                   vk::PipelineStageFlagBits2::eTransfer, dst_base_offset)) {
         pre_barriers.push_back(*dst_barrier);
     }
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = static_cast<u32>(pre_barriers.size()),
         .pBufferMemoryBarriers = pre_barriers.data(),
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, std::vector(pre_barriers.begin(), pre_barriers.end()),
+                             {}, vk::DependencyFlagBits::eByRegion);
 
     cmdbuf.copyBuffer(overlap.Handle(), new_buffer.Handle(), copy);
 
@@ -657,11 +664,13 @@ void BufferCache::JoinOverlap(BufferId new_buffer_id, BufferId overlap_id,
             vk::PipelineStageFlagBits2::eAllCommands, dst_base_offset)) {
         post_barriers.push_back(*dst_barrier);
     }
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = static_cast<u32>(post_barriers.size()),
         .pBufferMemoryBarriers = post_barriers.data(),
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, std::vector(post_barriers.begin(), post_barriers.end()), {},
+                             vk::DependencyFlagBits::eByRegion);
     DeleteBuffer(overlap_id);
 }
 
@@ -742,11 +751,13 @@ void BufferCache::ProcessFaultBuffer() {
     scheduler.EndRendering();
     const auto cmdbuf = scheduler.CommandBuffer();
     cmdbuf.fillBuffer(download_buffer.Handle(), offset, MaxPageFaults * sizeof(u64), 0);
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 2,
         .pBufferMemoryBarriers = barriers.data(),
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {barriers[0], barriers[1]}, {},
+                             vk::DependencyFlagBits::eByRegion);
     cmdbuf.bindPipeline(vk::PipelineBindPoint::eCompute, *fault_process_pipeline);
     cmdbuf.pushDescriptorSetKHR(vk::PipelineBindPoint::eCompute, *fault_process_pipeline_layout, 0,
                                 writes);
@@ -773,17 +784,20 @@ void BufferCache::ProcessFaultBuffer() {
         .offset = 0,
         .size = FAULT_BUFFER_SIZE,
     };
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &reset_pre_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {reset_pre_barrier}, {},
+                             vk::DependencyFlagBits::eByRegion);
     cmdbuf.fillBuffer(fault_buffer.buffer, 0, FAULT_BUFFER_SIZE, 0);
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &reset_post_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {reset_post_barrier}, {}, vk::DependencyFlagBits::eByRegion);
 
     // Defer creating buffers
     scheduler.DeferOperation([this, mapped]() {
@@ -893,17 +907,20 @@ bool BufferCache::SynchronizeBuffer(Buffer& buffer, VAddr device_addr, u32 size,
             .offset = 0,
             .size = buffer.SizeBytes(),
         };
-        cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+        /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
             .dependencyFlags = vk::DependencyFlagBits::eByRegion,
             .bufferMemoryBarrierCount = 1,
             .pBufferMemoryBarriers = &pre_barrier,
-        });
+        });*/
+        Kasper::PipelineBarrier1(cmdbuf, {pre_barrier}, {},
+                                 vk::DependencyFlagBits::eByRegion);
         cmdbuf.copyBuffer(src_buffer, buffer.buffer, copies);
-        cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+        /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
             .dependencyFlags = vk::DependencyFlagBits::eByRegion,
             .bufferMemoryBarrierCount = 1,
             .pBufferMemoryBarriers = &post_barrier,
-        });
+        });*/
+        Kasper::PipelineBarrier1(cmdbuf, {post_barrier}, {}, vk::DependencyFlagBits::eByRegion);
         TouchBuffer(buffer);
     }
     if (is_texel_buffer) {
@@ -1006,21 +1023,24 @@ bool BufferCache::SynchronizeBufferFromImage(Buffer& buffer, VAddr device_addr, 
         image.GetBarriers(vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits2::eTransferRead,
                           vk::PipelineStageFlagBits2::eTransfer, {});
     auto cmdbuf = scheduler.CommandBuffer();
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &pre_barrier,
         .imageMemoryBarrierCount = static_cast<u32>(barriers.size()),
         .pImageMemoryBarriers = barriers.data(),
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {pre_barrier}, std::vector(barriers.begin(), barriers.end()),
+                             vk::DependencyFlagBits::eByRegion);
     auto& tile_manager = texture_cache.GetTileManager();
     tile_manager.TileImage(image.image, buffer_copies, buffer.Handle(), buf_offset, image.info);
     cmdbuf = scheduler.CommandBuffer();
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &post_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {post_barrier}, {}, vk::DependencyFlagBits::eByRegion);
     return true;
 }
 
@@ -1051,10 +1071,19 @@ void BufferCache::MemoryBarrier() {
         .dstStageMask = vk::PipelineStageFlagBits2::eAllCommands,
         .dstAccessMask = vk::AccessFlagBits2::eMemoryRead,
     };
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .memoryBarrierCount = 1,
         .pMemoryBarriers = &barrier,
-    });
+    });*/
+    // Kasper
+    cmdbuf.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                           vk::PipelineStageFlagBits::eAllCommands,
+                           vk::DependencyInfo{}.dependencyFlags,
+                           std::vector{vk::MemoryBarrier{
+                               .srcAccessMask = vk::AccessFlagBits::eMemoryWrite,
+                               .dstAccessMask = vk::AccessFlagBits::eMemoryRead,
+                           }},
+                           {}, {});
 }
 
 void BufferCache::InlineDataBuffer(Buffer& buffer, VAddr address, const void* value,
@@ -1079,11 +1108,12 @@ void BufferCache::InlineDataBuffer(Buffer& buffer, VAddr address, const void* va
         .offset = buffer.Offset(address),
         .size = num_bytes,
     };
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &pre_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {pre_barrier}, {}, vk::DependencyFlagBits::eByRegion);
     // vkCmdUpdateBuffer can only copy up to 65536 bytes at a time.
     static constexpr u32 UpdateBufferMaxSize = 65536;
     const auto dst_offset = buffer.Offset(address);
@@ -1093,11 +1123,12 @@ void BufferCache::InlineDataBuffer(Buffer& buffer, VAddr address, const void* va
         const auto update_size = std::min(num_bytes - offset, UpdateBufferMaxSize);
         cmdbuf.updateBuffer(buffer.Handle(), update_dst, update_size, update_src);
     }
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &post_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {post_barrier}, {}, vk::DependencyFlagBits::eByRegion);
 }
 
 void BufferCache::WriteDataBuffer(Buffer& buffer, VAddr address, const void* value, u32 num_bytes) {
@@ -1143,17 +1174,19 @@ void BufferCache::WriteDataBuffer(Buffer& buffer, VAddr address, const void* val
         .offset = buffer.Offset(address),
         .size = num_bytes,
     };
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &pre_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {pre_barrier}, {}, vk::DependencyFlagBits::eByRegion);
     cmdbuf.copyBuffer(src_buffer, buffer.Handle(), copy);
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &post_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {post_barrier}, {}, vk::DependencyFlagBits::eByRegion);
 }
 
 void BufferCache::FillBuffer(Buffer& buffer, VAddr address, u32 num_bytes, u32 value) {
@@ -1178,17 +1211,19 @@ void BufferCache::FillBuffer(Buffer& buffer, VAddr address, u32 num_bytes, u32 v
         .offset = buffer.Offset(address),
         .size = num_bytes,
     };
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &pre_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {pre_barrier}, {}, vk::DependencyFlagBits::eByRegion);
     cmdbuf.fillBuffer(buffer.Handle(), buffer.Offset(address), num_bytes, value);
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &post_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {post_barrier}, {}, vk::DependencyFlagBits::eByRegion);
 }
 
 void BufferCache::RunGarbageCollector() {

@@ -17,6 +17,8 @@
 
 #include "video_core/host_shaders/fs_tri_vert.h"
 
+#include "video_core/utils.h"
+
 #include <vk_mem_alloc.h>
 
 #include <imgui.h>
@@ -261,10 +263,11 @@ Frame* Presenter::PrepareLastFrame() {
                                 .image = frame->image,
                                 .subresourceRange{frame_subresources}};
 
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .imageMemoryBarrierCount = 1,
         .pImageMemoryBarriers = &pre_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {}, {pre_barrier});
 
     // Flush frame creation commands.
     frame->ready_semaphore = scheduler.GetMasterSemaphore()->Handle();
@@ -329,10 +332,11 @@ Frame* Presenter::PrepareFrameInternal(VideoCore::ImageId image_id,
                                 .image = frame->image,
                                 .subresourceRange{frame_subresources}};
 
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .imageMemoryBarrierCount = 1,
         .pImageMemoryBarriers = &pre_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {}, {pre_barrier});
 
     if (image_id != VideoCore::NULL_IMAGE_ID) {
         auto& image = texture_cache.GetImage(image_id);
@@ -384,8 +388,10 @@ Frame* Presenter::PrepareFrameInternal(VideoCore::ImageId image_id,
         DebugState.game_resolution = {image_size.width, image_size.height};
         DebugState.output_resolution = {frame->width, frame->height};
     } else {
+        // Kasper
+        // I commented this all out
         // Fix display of garbage images on startup on some drivers
-        const std::array<vk::RenderingAttachmentInfo, 1> attachments = {{
+        /*const std::array<vk::RenderingAttachmentInfo, 1> attachments = {{
             {
                 .imageView = frame->image_view,
                 .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -402,7 +408,7 @@ Frame* Presenter::PrepareFrameInternal(VideoCore::ImageId image_id,
             .pColorAttachments = attachments.data(),
         };
         cmdbuf.beginRendering(rendering_info);
-        cmdbuf.endRendering();
+        cmdbuf.endRendering();*/
     }
 
     const auto post_barrier =
@@ -415,10 +421,11 @@ Frame* Presenter::PrepareFrameInternal(VideoCore::ImageId image_id,
                                 .image = frame->image,
                                 .subresourceRange{frame_subresources}};
 
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .imageMemoryBarrierCount = 1,
         .pImageMemoryBarriers = &post_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {}, {post_barrier});
 
     if (vk_host_markers_enabled) {
         cmdbuf.endDebugUtilsLabelEXT();

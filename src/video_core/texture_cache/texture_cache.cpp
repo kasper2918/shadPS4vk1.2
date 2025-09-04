@@ -15,6 +15,7 @@
 #include "video_core/texture_cache/host_compatibility.h"
 #include "video_core/texture_cache/texture_cache.h"
 #include "video_core/texture_cache/tile_manager.h"
+#include "video_core/utils.h"
 
 namespace VideoCore {
 
@@ -692,11 +693,13 @@ void TextureCache::RefreshImage(Image& image, Vulkan::Scheduler* custom_schedule
     if (auto barrier = in_buffer->GetBarrier(vk::AccessFlagBits2::eTransferRead,
                                              vk::PipelineStageFlagBits2::eTransfer)) {
         const auto cmdbuf = sched_ptr->CommandBuffer();
-        cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+        /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
             .dependencyFlags = vk::DependencyFlagBits::eByRegion,
             .bufferMemoryBarrierCount = 1,
             .pBufferMemoryBarriers = &barrier.value(),
-        });
+        });*/
+        Kasper::PipelineBarrier1(cmdbuf, {barrier.value()}, {},
+                                 vk::DependencyFlagBits::eByRegion);
     }
 
     const auto [buffer, offset] =
@@ -728,19 +731,23 @@ void TextureCache::RefreshImage(Image& image, Vulkan::Scheduler* custom_schedule
         image.GetBarriers(vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits2::eTransferWrite,
                           vk::PipelineStageFlagBits2::eTransfer, {});
     const auto cmdbuf = sched_ptr->CommandBuffer();
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &pre_barrier,
         .imageMemoryBarrierCount = static_cast<u32>(image_barriers.size()),
         .pImageMemoryBarriers = image_barriers.data(),
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {pre_barrier},
+                             std::vector(image_barriers.begin(), image_barriers.end()),
+                             vk::DependencyFlagBits::eByRegion);
     cmdbuf.copyBufferToImage(buffer, image.image, vk::ImageLayout::eTransferDstOptimal, image_copy);
-    cmdbuf.pipelineBarrier2(vk::DependencyInfo{
+    /*cmdbuf.pipelineBarrier2(vk::DependencyInfo{
         .dependencyFlags = vk::DependencyFlagBits::eByRegion,
         .bufferMemoryBarrierCount = 1,
         .pBufferMemoryBarriers = &post_barrier,
-    });
+    });*/
+    Kasper::PipelineBarrier1(cmdbuf, {post_barrier}, {}, vk::DependencyFlagBits::eByRegion);
     image.flags &= ~ImageFlagBits::Dirty;
 }
 

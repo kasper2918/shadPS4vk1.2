@@ -10,6 +10,7 @@
 #include "video_core/renderer_vulkan/vk_pipeline_common.h"
 #include "video_core/renderer_vulkan/vk_scheduler.h"
 #include "video_core/texture_cache/texture_cache.h"
+#include "video_core/utils.h"
 
 namespace Vulkan {
 
@@ -28,13 +29,16 @@ void Pipeline::BindResources(DescriptorWrites& set_writes, const BufferBarriers&
         IsCompute() ? vk::PipelineBindPoint::eCompute : vk::PipelineBindPoint::eGraphics;
 
     if (!buffer_barriers.empty()) {
-        const auto dependencies = vk::DependencyInfo{
+        /*const auto dependencies = vk::DependencyInfo{
             .dependencyFlags = vk::DependencyFlagBits::eByRegion,
             .bufferMemoryBarrierCount = u32(buffer_barriers.size()),
             .pBufferMemoryBarriers = buffer_barriers.data(),
-        };
+        };*/
         scheduler.EndRendering();
-        cmdbuf.pipelineBarrier2(dependencies);
+        //cmdbuf.pipelineBarrier2(dependencies);
+        Kasper::PipelineBarrier1(cmdbuf,
+                                 std::vector(buffer_barriers.begin(), buffer_barriers.end()), {},
+                                 vk::DependencyFlagBits::eByRegion);
     }
 
     const auto stage_flags = IsCompute() ? vk::ShaderStageFlagBits::eCompute : AllGraphicsStageBits;
