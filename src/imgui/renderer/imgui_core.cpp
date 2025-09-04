@@ -225,7 +225,7 @@ void Render(const vk::CommandBuffer& cmdbuf, const vk::ImageView& image_view,
         });
     }
 
-    vk::RenderingAttachmentInfo color_attachments[1]{
+    /*vk::RenderingAttachmentInfo color_attachments[1]{
         {
             .imageView = image_view,
             .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
@@ -240,10 +240,10 @@ void Render(const vk::CommandBuffer& cmdbuf, const vk::ImageView& image_view,
     };
     render_info.layerCount = 1;
     render_info.colorAttachmentCount = 1;
-    render_info.pColorAttachments = color_attachments;
-    cmdbuf.beginRendering(render_info);
-    Vulkan::RenderDrawData(*draw_data, cmdbuf);
-    cmdbuf.endRendering();
+    render_info.pColorAttachments = color_attachments;*/
+    //cmdbuf.beginRendering(render_info);
+    Vulkan::RenderDrawData(*draw_data, cmdbuf, image_view, extent);
+    //cmdbuf.endRendering();
     if (Config::getVkHostMarkersEnabled()) {
         cmdbuf.endDebugUtilsLabelEXT();
     }

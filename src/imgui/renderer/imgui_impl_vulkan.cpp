@@ -557,6 +557,8 @@ static void SetupRenderState(ImDrawData& draw_data, vk::Pipeline pipeline, vk::C
 
 // Render function
 void RenderDrawData(ImDrawData& draw_data, vk::CommandBuffer command_buffer,
+                    const vk::ImageView& image_view,
+                    const vk::Extent2D& extent,
                     vk::Pipeline pipeline) {
     // Avoid rendering when minimized, scale coordinates for retina displays (screen coordinates !=
     // framebuffer coordinates)
@@ -571,6 +573,36 @@ void RenderDrawData(ImDrawData& draw_data, vk::CommandBuffer command_buffer,
     if (pipeline == VK_NULL_HANDLE) {
         pipeline = bd->pipeline;
     }
+
+    IM_ASSERT(v.render_pass != nullptr);
+
+    vk::FramebufferCreateInfo framebuffer_info{
+        .renderPass = v.render_pass,
+        .attachmentCount = 1,
+        .pAttachments = &image_view,
+        .width = u32(fb_width),
+        .height = u32(fb_height),
+        .layers = 1,
+    };
+
+    auto [result, framebuffer] = v.device.createFramebuffer(framebuffer_info, v.allocator);
+    if (result != vk::Result::eSuccess) {
+        IM_ASSERT(false);
+    }
+
+    vk::RenderPassBeginInfo render_pass_info{};
+    render_pass_info.renderPass = v.render_pass;
+    render_pass_info.framebuffer = framebuffer;
+    render_pass_info.renderArea = vk::Rect2D{
+        .offset = {0, 0},
+        .extent = extent,
+    };
+    vk::ClearColorValue color{.float32 = {{0.0f, 0.0f, 0.0f, 1.0f}}};
+    vk::ClearValue clearColor{.color = color};
+    render_pass_info.clearValueCount = 1;
+    render_pass_info.pClearValues = &clearColor;
+
+    command_buffer.beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
 
     // Allocate array to store enough vertex/index buffers
     WindowRenderBuffers& wrb = bd->render_buffers;
@@ -698,6 +730,8 @@ void RenderDrawData(ImDrawData& draw_data, vk::CommandBuffer command_buffer,
     }
     //    vk::Rect2D scissor = {{0, 0}, {(uint32_t)fb_width, (uint32_t)fb_height}};
     //    command_buffer.setScissor(0, 1, &scissor);
+    command_buffer.endRenderPass();
+    v.device.destroyFramebuffer(framebuffer, v.allocator);
 }
 
 static void DestroyFontsTexture();

@@ -33,6 +33,7 @@ struct InitInfo {
     // (Optional) Allocation, Logging
     const vk::AllocationCallbacks* allocator{};
     void (*check_vk_result_fn)(vk::Result err);
+    // Kasper
     vk::RenderPass render_pass;
 };
 
@@ -65,6 +66,8 @@ void RemoveTexture(ImTextureID descriptor_set);
 bool Init(InitInfo info);
 void Shutdown();
 void RenderDrawData(ImDrawData& draw_data, vk::CommandBuffer command_buffer,
+                    const vk::ImageView& image_view,
+                    const vk::Extent2D& extent,
                     vk::Pipeline pipeline = VK_NULL_HANDLE);
 
 void SetBlendEnabled(bool enabled);
