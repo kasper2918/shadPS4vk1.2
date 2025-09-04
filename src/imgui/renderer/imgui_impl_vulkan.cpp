@@ -1065,8 +1065,26 @@ static void CreatePipeline(vk::Device device, const vk::AllocationCallbacks* all
         .pDynamicStates = dynamic_states,
     };
 
-    vk::GraphicsPipelineCreateInfo info{
+    /*vk::GraphicsPipelineCreateInfo info{
         .pNext = &v.pipeline_rendering_create_info,
+        .flags = bd->pipeline_create_flags,
+        .stageCount = 2,
+        .pStages = stage,
+        .pVertexInputState = &vertex_info,
+        .pInputAssemblyState = &ia_info,
+        .pViewportState = &viewport_info,
+        .pRasterizationState = &raster_info,
+        .pMultisampleState = &ms_info,
+        .pDepthStencilState = &depth_info,
+        .pColorBlendState = &blend_info,
+        .pDynamicState = &dynamic_state,
+        .layout = bd->pipeline_layout,
+        .renderPass = render_pass,
+        .subpass = subpass,
+    };*/
+    // Kasper
+    vk::GraphicsPipelineCreateInfo info{
+        .pNext = nullptr,
         .flags = bd->pipeline_create_flags,
         .stageCount = 2,
         .pStages = stage,
@@ -1155,7 +1173,7 @@ bool CreateDeviceObjects() {
             CheckVkResult(v.device.createPipelineLayout(layout_info, v.allocator));
     }
 
-    CreatePipeline(v.device, v.allocator, v.pipeline_cache, nullptr, &bd->pipeline, v.subpass);
+    CreatePipeline(v.device, v.allocator, v.pipeline_cache, v.render_pass, &bd->pipeline, v.subpass);
 
     if (bd->command_pool == VK_NULL_HANDLE) {
         vk::CommandPoolCreateInfo info{

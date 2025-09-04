@@ -16,6 +16,7 @@
 #include "sdl_window.h"
 #include "texture_manager.h"
 #include "video_core/renderer_vulkan/vk_presenter.h"
+#include "video_core/utils.h"
 
 #include "imgui_fonts/notosansjp_regular.ttf.g.cpp"
 #include "imgui_fonts/proggyvector_regular.ttf.g.cpp"
@@ -86,6 +87,9 @@ void Initialize(const ::Vulkan::Instance& instance, const Frontend::WindowSDL& w
     ::Core::Devtools::Layer::SetupSettings();
     Sdl::Init(window.GetSDLWindow());
 
+    vk::RenderPass render_pass =
+        Kasper::CreateDefaultRenderPass(instance.GetDevice(), surface_format);
+
     const Vulkan::InitInfo vk_info{
         .instance = instance.GetInstance(),
         .physical_device = instance.GetPhysicalDevice(),
@@ -100,6 +104,7 @@ void Initialize(const ::Vulkan::Instance& instance, const Frontend::WindowSDL& w
         },
         .allocator = allocator,
         .check_vk_result_fn = &CheckVkResult,
+        .render_pass = render_pass,
     };
     Vulkan::Init(vk_info);
 

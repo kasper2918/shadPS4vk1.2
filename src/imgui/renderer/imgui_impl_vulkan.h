@@ -33,6 +33,7 @@ struct InitInfo {
     // (Optional) Allocation, Logging
     const vk::AllocationCallbacks* allocator{};
     void (*check_vk_result_fn)(vk::Result err);
+    vk::RenderPass render_pass;
 };
 
 // Prepare all resources needed for uploading textures

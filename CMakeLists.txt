@@ -1145,7 +1145,7 @@ else()
         src/emulator.h
         src/sdl_window.h
         src/sdl_window.cpp
-    )
+     "src/video_core/utils.h")
 endif()
 
 create_target_directory_groups(shadps4)
